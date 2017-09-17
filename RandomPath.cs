@@ -20,6 +20,10 @@ public class RandomPath : MonoBehaviour
     public float minAngleSpeed = 1;
     public float maxAngleSpeed = 2;
 
+    [Header("Other")]
+    [Tooltip("Should the path exceed this length? If put negative it will ignore the max length.")]
+    public float maxLength = 1;
+
     [Tooltip("Change this to create a more precise path. Or add more enum types and increment their value.")]
     public PathQuality quality = PathQuality.MEDIUM;
     #endregion
@@ -34,7 +38,7 @@ public class RandomPath : MonoBehaviour
         for (float t = 0; t < 1; t+= smallStep)
         {
             GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cube.transform.position = GetVectorFromPath(t, path);
+            cube.transform.position = GetPointFromPath(t, path);
         }
     }
 
@@ -44,10 +48,13 @@ public class RandomPath : MonoBehaviour
     /// <param name="start">Starting vector, change the algorithm if you don't want to create a path in X/Y direction</param>
     /// <param name="numberOfDecisions">Length of the path or how many times algorithm decides to provide with new angle. The overall length of the path is numOfDecisions * decisionLenght * step</param>
     /// <param name="startAngle">Start angle (see unit circle and its angles)</param>
+    /// <param name="maxLength">Max length (distance betwen a starting point and a point on path. Negative if no max length required.)</param>
     /// <returns></returns>
-    public List<Vector3> CreatePath(Vector2 start, int numberOfDecisions, float startAngle = 0)
+    public List<Vector3> CreatePath(Vector2 start, int numberOfDecisions, float startAngle = 0, float maxLength = -1)
     {
+        Vector2 startPosCache = start;
         List<Vector3> pathPoints = new List<Vector3>();
+        float currentMaxLength = 0;
 
         for (int i = 0; i < numberOfDecisions; i++)
         {
@@ -64,18 +71,27 @@ public class RandomPath : MonoBehaviour
 
             while (nextDecision-- > 0)
             {
-                if (startAngle >= endAngle)
-                    startAngle -= Mathf.Abs(angleSpeed);
-                else if (startAngle <= endAngle)
-                    startAngle += Mathf.Abs(angleSpeed);
+                startAngle = startAngle >= endAngle ? 
+                    startAngle - Mathf.Abs(angleSpeed) : 
+                    startAngle + Mathf.Abs(angleSpeed);
 
                 Quaternion qAngle = Quaternion.AngleAxis(startAngle, Vector3.forward);
                 Vector3 nextPos = qAngle * new Vector3(1f / (int)quality, 0, 0);
 
                 start += new Vector2(nextPos.x, nextPos.y);
 
+                float distance = Vector3.Distance(start, startPosCache);
+                if (distance > currentMaxLength)
+                    currentMaxLength = distance;
+
+                if (maxLength > 0 && currentMaxLength > maxLength)
+                    break;
+
                 pathPoints.Add(start);
             }
+
+            if (maxLength > 0 && currentMaxLength > maxLength)
+                break;
         }
 
         return pathPoints;
@@ -87,7 +103,7 @@ public class RandomPath : MonoBehaviour
     /// <param name="t">Value from 0 - 1</param>
     /// <param name="list">List of generated points</param>
     /// <returns></returns>
-    public static Vector3 GetVectorFromPath(float t, List<Vector3> list)
+    public static Vector3 GetPointFromPath(float t, List<Vector3> list)
     {
         if (list == null || list.Count == 0)
             throw new UnityException("Path list is null or empty.");
